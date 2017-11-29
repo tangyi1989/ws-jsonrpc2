@@ -1,7 +1,6 @@
 package jsonrpc2
 
 import (
-	"log"
 	"sync"
 
 	"net/http"
@@ -73,6 +72,5 @@ func (c *Conn) SetData(key string, value interface{}) {
 	c.mu.Lock()
 	c.mu.Unlock()
 
-	log.Println("SetData", c.extraData, "key:", key, "value:", value)
 	c.extraData[key] = value
 }
