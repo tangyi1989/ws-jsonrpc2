@@ -74,3 +74,10 @@ func (c *Conn) SetData(key string, value interface{}) {
 
 	c.extraData[key] = value
 }
+
+func (c *Conn) DelData(key string) {
+	c.mu.Lock()
+	c.mu.Unlock()
+
+	delete(c.extraData, key)
+}
