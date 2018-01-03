@@ -85,5 +85,21 @@ func ServeRPC(r *http.Request, ws *websocket.Conn, server ...*Server) {
 		s = server[0]
 	}
 
-	s.ServeCodec(r, codec)
+	s.ServeCodec(r, codec, nil)
+}
+
+func ServeRPCwithInit(r *http.Request, ws *websocket.Conn, onInit ConnHandler,
+	server ...*Server) {
+
+	var s *Server
+
+	rwc := &ReadWriteCloser{WS: ws}
+	codec := NewServerCodec(rwc)
+	if len(server) == 0 {
+		s = DefaultServer
+	} else {
+		s = server[0]
+	}
+
+	s.ServeCodec(r, codec, onInit)
 }

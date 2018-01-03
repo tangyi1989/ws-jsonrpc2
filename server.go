@@ -420,11 +420,15 @@ func (s *service) call(server *Server, sending *sync.Mutex, mtype *methodType,
 
 // ServeCodec is like ServeConn but uses the specified codec to
 // decode requests and encode responses.
-func (server *Server) ServeCodec(req *http.Request, codec ServerCodec) {
+func (server *Server) ServeCodec(req *http.Request, codec ServerCodec, onInit ConnHandler) {
 	sending := new(sync.Mutex)
 	conn := NewConn(req, sending, codec)
 	if server.onConnInit != nil {
 		server.onConnInit(conn)
+	}
+
+	if onInit != nil {
+		onInit(conn)
 	}
 
 	for {
@@ -590,5 +594,5 @@ type ServerCodec interface {
 // ServeCodec is like ServeConn but uses the specified codec to
 // decode requests and encode responses.
 func ServeCodec(r *http.Request, codec ServerCodec) {
-	DefaultServer.ServeCodec(r, codec)
+	DefaultServer.ServeCodec(r, codec, nil)
 }
