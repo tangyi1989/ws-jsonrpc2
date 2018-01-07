@@ -450,8 +450,12 @@ func (server *Server) ServeCodec(req *http.Request, codec ServerCodec, onInit Co
 		go service.call(server, sending, mtype, conn, req, argv, replyv, codec)
 	}
 
+	conn.ternimating()
+
+	//! close may write in that conn, just prevnet that
+	sending.Lock()
 	codec.Close()
-	conn.ternimated()
+	sending.Unlock()
 }
 
 func (server *Server) getRequest() *Request {

@@ -28,13 +28,13 @@ func NewConn(req *http.Request, sending *sync.Mutex, codec ServerCodec) *Conn {
 	}
 }
 
-func (c *Conn) ternimated() {
+func (c *Conn) ternimating() {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
 	c.closed = true
 	for _, handler := range c.closeHandlers {
-		go handler()
+		handler()
 	}
 
 	c.closeHandlers = []ConnCloseHandler{}
