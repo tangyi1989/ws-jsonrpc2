@@ -7,17 +7,9 @@ import (
 	"github.com/gorilla/websocket"
 )
 
-type RWCCloseHandler func()
-
 type ReadWriteCloser struct {
-	WS           *websocket.Conn
-	r            io.Reader
-	w            io.WriteCloser
-	closeHandler RWCCloseHandler
-}
-
-func (rwc *ReadWriteCloser) OnClose(handler RWCCloseHandler) {
-	rwc.closeHandler = handler
+	WS *websocket.Conn
+	r  io.Reader
 }
 
 func (rwc *ReadWriteCloser) Read(p []byte) (n int, err error) {
@@ -32,9 +24,6 @@ func (rwc *ReadWriteCloser) Read(p []byte) (n int, err error) {
 		m, err = rwc.r.Read(p[n:])
 		n += m
 		if err == io.EOF {
-			if rwc.closeHandler != nil {
-				go rwc.closeHandler()
-			}
 			rwc.r = nil
 			break
 		}
@@ -46,32 +35,33 @@ func (rwc *ReadWriteCloser) Read(p []byte) (n int, err error) {
 }
 
 func (rwc *ReadWriteCloser) Write(p []byte) (n int, err error) {
-	if rwc.w == nil {
-		rwc.w, err = rwc.WS.NextWriter(websocket.TextMessage)
-		if err != nil {
-			return 0, err
-		}
+	var w io.WriteCloser
+	w, err = rwc.WS.NextWriter(websocket.TextMessage)
+	if err != nil {
+		return 0, err
 	}
+
 	for n = 0; n < len(p); {
 		var m int
-		m, err = rwc.w.Write(p)
+		m, err = w.Write(p)
 		n += m
 		if err != nil {
 			break
 		}
 	}
-	if err != nil || n == len(p) {
+
+	if err != nil {
 		err = rwc.Close()
+		return
 	}
+
+	w.Close()
 	return
 }
 
 func (rwc *ReadWriteCloser) Close() (err error) {
-	if rwc.w != nil {
-		err = rwc.w.Close()
-		rwc.w = nil
-	}
-	return err
+	err = rwc.WS.Close()
+	return
 }
 
 func ServeRPC(r *http.Request, ws *websocket.Conn, server ...*Server) {

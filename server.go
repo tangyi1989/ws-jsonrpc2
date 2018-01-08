@@ -452,7 +452,7 @@ func (server *Server) ServeCodec(req *http.Request, codec ServerCodec, onInit Co
 
 	conn.ternimating()
 
-	//! close may write in that conn, just prevnet that
+	//  close may write in that conn, just prevnet that
 	sending.Lock()
 	codec.Close()
 	sending.Unlock()
