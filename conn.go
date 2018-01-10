@@ -3,12 +3,21 @@ package jsonrpc2
 import (
 	"sync"
 
+	"errors"
 	"net/http"
 )
+
+type notifyEvent struct {
+	method string
+	params interface{}
+}
 
 type ConnCloseHandler func()
 
 type Conn struct {
+	notifyChan chan *notifyEvent
+	stopChan   chan interface{}
+
 	Request       *http.Request
 	rwc           *ReadWriteCloser
 	codec         ServerCodec
@@ -20,11 +29,39 @@ type Conn struct {
 }
 
 func NewConn(req *http.Request, sending *sync.Mutex, codec ServerCodec) *Conn {
-	return &Conn{
-		Request:   req,
-		sending:   sending,
-		codec:     codec,
-		extraData: make(map[string]interface{}),
+	conn := &Conn{
+		Request:    req,
+		sending:    sending,
+		codec:      codec,
+		notifyChan: make(chan *notifyEvent, 1024),
+		stopChan:   make(chan interface{}),
+		extraData:  make(map[string]interface{}),
+	}
+
+	go conn.notifyLoop()
+	return conn
+}
+
+func (c *Conn) notifyLoop() {
+	for {
+		var isStop bool
+		select {
+		case notify := <-c.notifyChan:
+			c.sending.Lock()
+			err := c.codec.WriteNotification(notify.method, notify.params)
+			c.sending.Unlock()
+
+			if err != nil {
+				c.Close()
+				isStop = true
+			}
+		case <-c.stopChan:
+			isStop = true
+		}
+
+		if isStop {
+			break
+		}
 	}
 }
 
@@ -32,6 +69,7 @@ func (c *Conn) ternimating() {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
+	close(c.stopChan)
 	c.closed = true
 	for _, handler := range c.closeHandlers {
 		handler()
@@ -40,11 +78,21 @@ func (c *Conn) ternimating() {
 	c.closeHandlers = []ConnCloseHandler{}
 }
 
-func (c *Conn) Notify(method string, params interface{}) error {
-	c.sending.Lock()
-	defer c.sending.Unlock()
+func (c *Conn) AsyncNotify(method string, params interface{}) error {
+	if c.closed {
+		return errors.New("conn is closed.")
+	}
 
-	return c.codec.WriteNotification(method, params)
+	select {
+	case c.notifyChan <- &notifyEvent{
+		method: method,
+		params: params,
+	}:
+	default:
+		return errors.New("Notify chan is full.")
+	}
+
+	return nil
 }
 
 func (c *Conn) Close() error {
