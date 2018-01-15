@@ -7,6 +7,7 @@ import (
 	"github.com/gorilla/websocket"
 )
 
+// ReadWriteCloser ...
 type ReadWriteCloser struct {
 	WS *websocket.Conn
 	r  io.Reader
@@ -59,11 +60,13 @@ func (rwc *ReadWriteCloser) Write(p []byte) (n int, err error) {
 	return
 }
 
+// Close ...
 func (rwc *ReadWriteCloser) Close() (err error) {
 	err = rwc.WS.Close()
 	return
 }
 
+// ServeRPC ...
 func ServeRPC(r *http.Request, ws *websocket.Conn, server ...*Server) {
 	var s *Server
 
@@ -78,6 +81,7 @@ func ServeRPC(r *http.Request, ws *websocket.Conn, server ...*Server) {
 	s.ServeCodec(r, codec, nil)
 }
 
+// ServeRPCwithInit ...
 func ServeRPCwithInit(r *http.Request, ws *websocket.Conn, onInit ConnHandler,
 	server ...*Server) {
 
