@@ -127,6 +127,7 @@
 package jsonrpc2
 
 import (
+	"encoding/json"
 	"errors"
 	"io"
 	"log"
@@ -194,7 +195,19 @@ type Server struct {
 	respLock   sync.Mutex // protects freeResp
 	freeResp   *Response
 
-	onConnInit ConnHandler
+	onConnInit      ConnHandler
+	onMissingMethod MissingMethodFunc
+}
+
+// conn, method, params
+type MissingMethodFunc func(*Conn, string, json.RawMessage) (interface{}, error)
+
+type ErrMissingServiceMethod struct {
+	msg string
+}
+
+func (err ErrMissingServiceMethod) Error() string {
+	return err.msg
 }
 
 // NewServer returns a new Server.
@@ -213,6 +226,10 @@ func isExported(name string) bool {
 
 func (server *Server) OnConnInit(handler ConnHandler) {
 	server.onConnInit = handler
+}
+
+func (server *Server) OnMissingMethod(handler MissingMethodFunc) {
+	server.onMissingMethod = handler
 }
 
 // Is this type exported or a builtin?
@@ -440,10 +457,32 @@ func (server *Server) ServeCodec(req *http.Request, codec ServerCodec, onInit Co
 			if !keepReading {
 				break
 			}
-			// send a response if we actually managed to read a header.
-			if req != nil {
-				server.sendResponse(sending, req, invalidRequest, codec, err.Error())
-				server.freeRequest(req)
+
+			switch err.(type) {
+			case ErrMissingServiceMethod:
+				if server.onMissingMethod != nil {
+					method, params := codec.GetCurrentRequest()
+					go func() {
+						var errMsg string
+						reply, err := server.onMissingMethod(conn, method, params)
+						if err != nil {
+							errMsg = err.Error()
+						}
+						server.sendResponse(sending, req, reply, codec, errMsg)
+						server.freeRequest(req)
+					}()
+				} else {
+					if req != nil {
+						server.sendResponse(sending, req, invalidRequest, codec, err.Error())
+						server.freeRequest(req)
+					}
+				}
+			default:
+				// send a response if we actually managed to read a header.
+				if req != nil {
+					server.sendResponse(sending, req, invalidRequest, codec, err.Error())
+					server.freeRequest(req)
+				}
 			}
 			continue
 		}
@@ -559,12 +598,12 @@ func (server *Server) readRequestHeader(codec ServerCodec) (service *service, mt
 	service = server.serviceMap[serviceName]
 	server.mu.RUnlock()
 	if service == nil {
-		err = errors.New("rpc: can't find service " + req.ServiceMethod)
+		err = ErrMissingServiceMethod{"rpc: can't find service " + req.ServiceMethod}
 		return
 	}
 	mtype = service.method[methodName]
 	if mtype == nil {
-		err = errors.New("rpc: can't find method " + req.ServiceMethod)
+		err = ErrMissingServiceMethod{"rpc: can't find service " + req.ServiceMethod}
 	}
 	return
 }
@@ -591,6 +630,8 @@ type ServerCodec interface {
 	// WriteResponse must be safe for concurrent use by multiple goroutines.
 	WriteResponse(*Response, interface{}) error
 	WriteNotification(string, interface{}) error
+	// Addtion method
+	GetCurrentRequest() (method string, params json.RawMessage)
 
 	Close() error
 }

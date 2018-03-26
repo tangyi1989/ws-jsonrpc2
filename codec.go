@@ -105,6 +105,10 @@ func (c *serverCodec) ReadRequestBody(x interface{}) error {
 	return json.Unmarshal(*c.req.Params, &params)
 }
 
+func (c *serverCodec) GetCurrentRequest() (string, json.RawMessage) {
+	return c.req.Method, *c.req.Params
+}
+
 var null = json.RawMessage([]byte("null"))
 
 func (c *serverCodec) WriteResponse(r *Response, x interface{}) error {
