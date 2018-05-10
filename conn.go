@@ -58,6 +58,14 @@ func (c *Conn) Notify(method string, params interface{}) error {
 	return c.codec.WriteNotification(method, params)
 }
 
+// NotifyEx ...
+func (c *Conn) NotifyEx(method string, params interface{}) error {
+	c.sending.Lock()
+	defer c.sending.Unlock()
+
+	return c.codec.WriteNotificationEx(method, params)
+}
+
 // Close ...
 func (c *Conn) Close() error {
 	return c.codec.Close()

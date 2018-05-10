@@ -630,6 +630,7 @@ type ServerCodec interface {
 	// WriteResponse must be safe for concurrent use by multiple goroutines.
 	WriteResponse(*Response, interface{}) error
 	WriteNotification(string, interface{}) error
+	WriteNotificationEx(string, interface{}) error
 	// Addtion method
 	GetCurrentRequest() (method string, params json.RawMessage)
 

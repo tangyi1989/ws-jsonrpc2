@@ -96,13 +96,20 @@ func (c *serverCodec) ReadRequestBody(x interface{}) error {
 	if c.req.Params == nil {
 		return errMissingParams
 	}
-	// JSON params is array value.
-	// RPC params is struct.
-	// Unmarshal into array containing struct for now.
-	// Should think about making RPC more general.
-	var params [1]interface{}
-	params[0] = x
-	return json.Unmarshal(*c.req.Params, &params)
+
+	// JSON params structured object. Unmarshal to the args object.
+	if err := json.Unmarshal(*c.req.Params, x); err != nil {
+		// Clearly JSON params is not a structured object,
+		// fallback and attempt an unmarshal with JSON params as
+		// array value and RPC params is struct. Unmarshal into
+		// array containing the request struct.
+		params := [1]interface{}{x}
+		if err = json.Unmarshal(*c.req.Params, &params); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func (c *serverCodec) GetCurrentRequest() (string, json.RawMessage) {
@@ -140,6 +147,15 @@ func (c *serverCodec) WriteNotification(method string, x interface{}) error {
 		Method:       method,
 		Notification: method,
 		Params:       []interface{}{x},
+	})
+}
+
+func (c *serverCodec) WriteNotificationEx(method string, x interface{}) error {
+	return c.enc.Encode(&notification{
+		Version:      "2.0",
+		Method:       method,
+		Notification: method,
+		Params:       x,
 	})
 }
 
