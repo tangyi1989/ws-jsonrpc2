@@ -32,6 +32,7 @@ func (rwc *ReadWriteCloser) Read(p []byte) (n int, err error) {
 			break
 		}
 	}
+
 	return
 }
 
