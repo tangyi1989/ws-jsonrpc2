@@ -544,7 +544,10 @@ func (server *Server) readRequest(codec ServerCodec) (service *service, mtype *m
 			return
 		}
 		// discard body
-		codec.ReadRequestBody(nil)
+		readErr := codec.ReadRequestBody(nil)
+		if readErr != nil {
+			err = readErr
+		}
 		return
 	}
 

@@ -90,11 +90,12 @@ func (c *serverCodec) ReadRequestHeader(r *Request) error {
 }
 
 func (c *serverCodec) ReadRequestBody(x interface{}) error {
-	if x == nil {
-		return nil
-	}
 	if c.req.Params == nil {
 		return errMissingParams
+	}
+
+	if x == nil {
+		return nil
 	}
 
 	// JSON params structured object. Unmarshal to the args object.
